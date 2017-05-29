@@ -1,24 +1,24 @@
 # -*- coding: utf-8 -*-
 
-from terminal import CmdQueue
+from terminal import CmdQueue, Process
 
 
 def test_get():
     q = CmdQueue()
-    q.put((1, '4'))
-    q.put((0, '1'))
-    q.put((0, '2'))
-    q.put((0, '3'))
+    q.put(Process('4', 1))
+    q.put(Process('1', 0))
+    q.put(Process('2', 0))
+    q.put(Process('3', 0))
     v = q.get()
-    assert v[1] == '1'
+    assert v.name == '1'
     v = q.get()
-    assert v[1] == '1'
-    q.remove((0, '1'))
+    assert v.name == '1'
+    q.remove('1')
     v = q.get()
-    assert v[1] == '2'
-    q.remove((0, '2'))
+    assert v.name == '2'
+    q.remove('2')
     v = q.get()
-    assert v[1] == '3'
-    q.remove((0, '3'))
+    assert v.name == '3'
+    q.remove('3')
     v = q.get()
-    assert v[1] == '4'
+    assert v.name == '4'

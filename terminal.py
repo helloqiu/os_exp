@@ -1,23 +1,49 @@
 # -*- coding: utf-8 -*-
-from queue import PriorityQueue
-from heapq import heapify
 from termcolor import colored
 
 
-class CmdQueue(PriorityQueue):
-    def _get(self):
-        return self.queue[0]
+class CmdQueue(object):
+    def __init__(self):
+        self.queue = list((list(), list(), list()))
 
-    def remove(self, name):
-        self.queue.remove(name)
-        heapify(self.queue)  # So remove is now a O(len(self.queue)) op.
+    def put(self, process):
+        self.queue[process.priority].append(process)
+
+    def remove(self, process_name):
+        for i in self.queue:
+            for j in i:
+                if process_name == j.name:
+                    i.remove(j)
+
+    def get(self, name=None):
+        if name:
+            for i in self.queue:
+                for j in i:
+                    if name == j.name:
+                        return j
+            return None
+        for i in self.queue:
+            if len(i) > 0:
+                return i[0]
+
+
+class Process(object):
+    def __init__(self, name, priority):
+        self.priority = priority
+        self.name = name
+        self.resource = dict(r1=0, r2=0, r3=0, r4=0)
+
+    def add_resource(self, k, v):
+        self.resource[k] += v
+
+    def reduce_resource(self, k, v):
+        self.resource[k] -= v
 
 
 SHELL_WORD = colored('shell>', 'green')
 cmd_queue = CmdQueue()
 current_process = None
-resource_dict = dict()
-process_dict = dict()
+resource = dict(r1=1, r2=2, r3=3, r4=4)
 
 
 def parse_input(v):
@@ -27,6 +53,28 @@ def parse_input(v):
     return tuple(v_list)
 
 
+def chose_resource_process(r):
+    for i in cmd_queue.queue:
+        for j in i:
+            if j.resource[r] > 0:
+                i.remove(j)
+                i.insert(0, j)
+
+
+def process_exist(name):
+    for i in cmd_queue.queue:
+        for j in i:
+            if name == j.name:
+                return True
+    return False
+
+
+def destroy_process(process):
+    global resource
+    for k in process.resource.keys():
+        resource[k] += process.resource[k]
+
+
 def handle_input(v):
     global current_process
     v = v.lower().strip()
@@ -34,51 +82,59 @@ def handle_input(v):
         return None
     cmd, name, value = parse_input(v)
     if cmd == 'cr':
-        # Create process
-        if name in process_dict.keys():
+        if process_exist(name):
             return colored('There is already a process called "{}".'.format(name), 'red')
         try:
             value = int(value)
         except ValueError:
             return colored('Parameter {} is wrong'.format(value))
-        cmd_queue.put((2 - int(value), name))
-        process_dict[name] = int(value)
+        cmd_queue.put(Process(name, 2 - value))
+        # process_dict[name] = int(value)
+        # resource_dict[name] = dict()
     elif cmd == 'de':
-        if name not in process_dict.keys():
+        if not process_exist(name):
             return colored('No process called "{}".'.format(name), 'red')
-        cmd_queue.remove((process_dict.pop(name), name))
+        p = cmd_queue.get(name)
+        cmd_queue.remove(name)
+        destroy_process(p)
+        # for key in resource_dict[name].keys():
+        #    resource[key] += resource_dict[name][key]
+        # resource_dict.pop(name)
     elif cmd == 'req':
         try:
             value = int(value)
         except ValueError:
             return colored('Parameter {} is wrong'.format(value))
-        if name in resource_dict.keys():
-            resource_dict[name] += int(value)
+        if resource[name] < value:
+            chose_resource_process(name)
         else:
-            resource_dict[name] = int(value)
+            # current_rd = resource_dict[current_process[1]]
+            # if name in current_rd.keys():
+            #    current_rd[name] += int(value)
+            # else:
+            #    current_rd[name] = int(value)
+            current_process.add_resource(name, value)
+            resource[name] -= value
     elif cmd == 'rel':
-        if name not in resource_dict.keys():
-            return colored('No resource called "{}".'.format(name), 'red')
         try:
             value = int(value)
         except ValueError:
             return colored('Parameter {} is wrong'.format(value))
-        if value > resource_dict[name]:
+        if value > current_process.resource[name]:
             return colored(
                 'Process "{}" has {} "{}" but try releasing {}'.format(
-                    current_process[1],
-                    resource_dict[name],
+                    current_process.name,
+                    current_process.resource[name],
                     name,
                     value
                 ), 'red')
-        resource_dict[name] -= value
+        current_process.reduce_resource(name, value)
+        resource[name] += value
     elif cmd == 'to':
-        cmd_queue.remove(current_process)
-        process_dict.pop(current_process[1])
-    if current_process != cmd_queue.get():
-        resource_dict.clear()
-        current_process = cmd_queue.get()
-        return colored(current_process[1], 'yellow')
+        cmd_queue.remove(current_process.name)
+        cmd_queue.put(current_process)
+    current_process = cmd_queue.get()
+    return colored(current_process.name, 'yellow')
 
 
 if __name__ == '__main__':

@@ -32,6 +32,8 @@ class Process(object):
         self.priority = priority
         self.name = name
         self.resource = dict(r1=0, r2=0, r3=0, r4=0)
+        self.ready = True
+        self.resource_request = dict(r1=0, r2=0, r3=0, r4=0)
 
     def add_resource(self, k, v):
         self.resource[k] += v
@@ -75,6 +77,29 @@ def destroy_process(process):
         resource[k] += process.resource[k]
 
 
+def get_next():
+    global resource
+    while True:
+        process = cmd_queue.get()
+        ok = True
+        if process.ready:
+            return process
+        else:
+            for k in process.resource_request.keys():
+                if resource[k] < process.resource_request[k]:
+                    cmd_queue.remove(process.name)
+                    cmd_queue.put(process)
+                    ok = False
+                    break
+            if not ok:
+                continue
+            for k in process.resource_request.keys():
+                resource[k] -= process.resource_request[k]
+                process.resource_request[k] = 0
+            process.ready = True
+            return process
+
+
 def handle_input(v):
     global current_process
     v = v.lower().strip()
@@ -106,7 +131,11 @@ def handle_input(v):
         except ValueError:
             return colored('Parameter {} is wrong'.format(value))
         if resource[name] < value:
-            chose_resource_process(name)
+            # chose_resource_process(name)
+            cmd_queue.remove(current_process.name)
+            cmd_queue.put(current_process)
+            current_process.ready = False
+            current_process.resource_request[name] += value
         else:
             # current_rd = resource_dict[current_process[1]]
             # if name in current_rd.keys():
@@ -133,7 +162,8 @@ def handle_input(v):
     elif cmd == 'to':
         cmd_queue.remove(current_process.name)
         cmd_queue.put(current_process)
-    current_process = cmd_queue.get()
+    # current_process = cmd_queue.get()
+    current_process = get_next()
     return colored(current_process.name, 'yellow')
 
 
